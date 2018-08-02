@@ -4,7 +4,7 @@ pipeline {
     stage('Compile') {
       steps {
         sh '''export GPG_TTY=$(tty);
-mvn clean deploy -P release'''
+mvn clean install'''
       }
     }
     stage('archive') {
