@@ -16,7 +16,7 @@ mvn clean install appassembler:assemble'''
         }
         stage('Package') {
           steps {
-            sh 'cd target; cp src/main/resources/log4j2.xml target/chat-bot; tar -cvzf target/chatbot.tar target/chat-bot'
+            sh 'cp src/main/resources/log4j2.xml target/chat-bot; cd target; tar -cvzf target/chatbot.tar target/chat-bot'
             archiveArtifacts 'target/*.tar'
           }
         }
