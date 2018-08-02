@@ -4,7 +4,7 @@ pipeline {
     stage('Compile') {
       steps {
         sh '''export GPG_TTY=$(tty);
-mvn clean install appasembler:assemble'''
+mvn clean install appassembler:assemble'''
       }
     }
     stage('archive') {
@@ -16,7 +16,7 @@ mvn clean install appasembler:assemble'''
         }
         stage('Package') {
           steps {
-            sh 'cd target; tar -cvzf target/chatbot.tar target/chat-bot'
+            sh 'cd target; cp src/main/resources/log4j2.xml target/chat-bot; tar -cvzf target/chatbot.tar target/chat-bot'
             archiveArtifacts 'target/*.tar'
           }
         }
