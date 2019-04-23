@@ -47,7 +47,7 @@
 					<assembleDirectory>${project.build.directory}/${project.artifactId}</assembleDirectory>
 					<programs>
 						<program>
-							<mainClass>com.sirolf2009.gladiator.chat.GladiatorTradingBot</mainClass>
+							<mainClass>com.sirolf2009.gladiator.chat.GladiatorTradingChatBot</mainClass>
 							<id>run</id>
 							<jvmSettings>
 								<extraArgument>
