@@ -27,6 +27,7 @@ import org.telegram.telegrambots.TelegramBotsApi
 import org.telegram.telegrambots.api.methods.send.SendMessage
 import org.telegram.telegrambots.api.objects.Update
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
+import java.text.NumberFormat
 
 class GladiatorTradingChatBot extends TelegramLongPollingBot {
 
@@ -35,7 +36,7 @@ class GladiatorTradingChatBot extends TelegramLongPollingBot {
 	val Configuration configuration
 	val BitfinexApiBroker bitfinexApiBroker
 	val AtomicDouble currentPrice = new AtomicDouble(1)
-	val decimalFormat = new DecimalFormat("0.##")
+	val moneyFormat = NumberFormat.getCurrencyInstance()
 	
 	/*
 	 * //private floris chat
@@ -85,6 +86,7 @@ class GladiatorTradingChatBot extends TelegramLongPollingBot {
 			currentPrice.set(tick.getLastPrice().doubleValue())
 		]
 		bitfinexApiBroker.getQuoteManager().subscribeTicker(symbol)
+		
 		scheduleMorningMessage()
 	}
 
@@ -121,17 +123,28 @@ class GladiatorTradingChatBot extends TelegramLongPollingBot {
 	}
 
 	def sendPositionsTo(Long chatID) {
-		bitfinexApiBroker.getPositionManager().getPositions().map [
+		val wallets = bitfinexApiBroker.getWalletManager().getWallets()
+		val usdBalance = wallets.findFirst[getCurreny().equals("USD")].getBalance().doubleValue()
+		val btcBalance = wallets.findFirst[getCurreny().equals("BTC")].getBalance().doubleValue() * currentPrice.get()
+		val positions = bitfinexApiBroker.getPositionManager().getPositions()
+		val profit = positions.map[getProfit(getPrice())].reduce[a,b|a+b]
+		
+		positions.map [
 			val price = getPrice()
 			'''
 			«getCurreny().getCurrency1()» «getCurreny().getCurrency2()»
-			«if(isShort()) "Short" else "Long"» «getAmount().abs()» @ $«decimalFormat.format(getBasePrice())»
-			Profit: $«decimalFormat.format(getProfit(price))»    Current Price: $«decimalFormat.format(price)»'''
+			«if(isShort()) "Short" else "Long"» «getAmount().abs()» @ «moneyFormat.format(getBasePrice())»
+			Profit: «moneyFormat.format(getProfit(price))»    Current Price: «moneyFormat.format(price)»'''
 		].map [
 			new SendMessage().setChatId(chatID).setText(it)
 		].forEach [
 			sendMessage(it)
 		]
+		
+		sendMessage(new SendMessage().setChatId(chatID).setText('''
+		Total Balance: «moneyFormat.format(usdBalance + btcBalance)»
+		Total Profit: «moneyFormat.format(profit)»
+		NAV: «moneyFormat.format(usdBalance + btcBalance + profit)»'''))
 	}
 
 	def getPrice(Position position) {
