@@ -1,0 +1,2 @@
+#!/usr/bin/fish
+mcia; and cd target; and tar-folder chat-bot; and scp chat-bot.tar root@node:~/; and ssh root@node "tar -xf chat-bot.tar; and systemctl restart chatbot"

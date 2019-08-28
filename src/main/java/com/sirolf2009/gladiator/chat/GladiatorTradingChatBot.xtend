@@ -12,7 +12,7 @@ import java.math.BigDecimal
 import java.net.URL
 import java.nio.charset.Charset
 import java.nio.file.NoSuchFileException
-import java.text.DecimalFormat
+import java.text.NumberFormat
 import java.time.Duration
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -27,7 +27,7 @@ import org.telegram.telegrambots.TelegramBotsApi
 import org.telegram.telegrambots.api.methods.send.SendMessage
 import org.telegram.telegrambots.api.objects.Update
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
-import java.text.NumberFormat
+import java.text.DecimalFormat
 
 class GladiatorTradingChatBot extends TelegramLongPollingBot {
 
@@ -37,6 +37,8 @@ class GladiatorTradingChatBot extends TelegramLongPollingBot {
 	val BitfinexApiBroker bitfinexApiBroker
 	val AtomicDouble currentPrice = new AtomicDouble(1)
 	val moneyFormat = NumberFormat.getCurrencyInstance()
+	val twoDecimalsFormat = new DecimalFormat("#.##")
+	val shareManager = new ShareManager()
 	
 	/*
 	 * //private floris chat
@@ -118,8 +120,49 @@ class GladiatorTradingChatBot extends TelegramLongPollingBot {
 		if(update.hasMessage() && update.getMessage().hasText()) {
 			if(update.getMessage().getText().equals("/position")) {
 				sendPositionsTo(update.getMessage().getChatId())
+			} else if(update.getMessage().getText().startsWith("/shareset ")) {
+				setShare(update.getMessage().getChatId(), update.getMessage().getText())
+			} else if(update.getMessage().getText().startsWith("/share")) {
+				sendShareTo(update.getMessage().getChatId(), update.getMessage().getText())
+			} else if(update.getMessage().getText().startsWith("/")) {
+				sendMessage(new SendMessage().setChatId(update.getMessage().getChatId()).setText('''Unknown command «update.getMessage().getText()»'''))
 			}
 		}
+	}
+	
+	def setShare(Long chatID, String msg) {
+		log.info('''Setting share: «msg»''')
+		val data = msg.split(" ")
+		val name = data.get(1)
+		val share = Double.parseDouble(data.get(2))
+		val invested = Double.parseDouble(data.get(3))
+		val withdrawn = Double.parseDouble(data.get(4))
+		shareManager.set(name, share, invested, withdrawn)
+		log.info("set {}'s share to {}", name, share)
+		sendMessage(new SendMessage().setChatId(chatID).setText('''«name»'s share is now «share»'''))
+	}
+	
+	def sendShareTo(Long chatID, String msg) {
+		log.info('''Sending shares: «msg»''')
+		val wallets = bitfinexApiBroker.getWalletManager().getWallets()
+		val usdBalance = wallets.findFirst[getCurreny().equals("USD")].getBalance().doubleValue()
+		val btcBalance = wallets.findFirst[getCurreny().equals("BTC")].getBalance().doubleValue() * currentPrice.get()
+		val positions = bitfinexApiBroker.getPositionManager().getPositions()
+		val profit = positions.map[getProfit(getPrice())].reduce[a,b|a+b]
+		val NAV = usdBalance + btcBalance + profit
+		
+		val data = msg.split(" ")
+		val response = if(data.size() == 1) {
+			shareManager.read().map[
+				'''«getName()»: «getShare()»% = «moneyFormat.format(getShareWorth(NAV))»; «twoDecimalsFormat.format(getPercentageReturn(NAV))»% return'''
+			].join("\n")
+		} else {
+			val shareHolderName = data.tail().join(" ")
+			shareManager.read().filter[getName().equalsIgnoreCase(shareHolderName)].map[
+				'''«getName()»: «getShare()»% = «moneyFormat.format(getShareWorth(NAV))»; «twoDecimalsFormat.format(getPercentageReturn(NAV))»% return'''
+			].join("\n")
+		}
+		sendMessage(new SendMessage().setChatId(chatID).setText(response))
 	}
 
 	def sendPositionsTo(Long chatID) {
